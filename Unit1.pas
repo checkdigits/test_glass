@@ -7,7 +7,8 @@ uses
   FMX.Types, FMX.Controls, FMX.Forms, FMX.Graphics, FMX.Dialogs,
   FMX.Objects, FMX.Controls.Presentation, FMX.StdCtrls,
   TMS.MQTT.Global, TMS.MQTT.Client, FMX.Layouts, FMX.ListBox,
-  FMX.Effects, FMX.Filter.Effects, System.Skia, FMX.Skia;
+  FMX.Effects, FMX.Filter.Effects, System.Skia, FMX.Skia, FMX.Ani,
+  FMX.Styles.Objects;
 
 
 // Background texture: Designed by Freepik - https://www.freepik.com/free-photo/steel-metallic-texture-background_208418939.htm
@@ -22,7 +23,6 @@ type
     GoButton: TButton;
     ListBox1: TListBox;
     ShadowEffect1: TShadowEffect;
-    ShadowEffect2: TShadowEffect;
     ShadowEffect3: TShadowEffect;
     ShadowEffect4: TShadowEffect;
     CloseButton: TSkSvg;
@@ -31,6 +31,7 @@ type
     GlowEffect1: TGlowEffect;
     GlowEffect2: TGlowEffect;
     GlowEffect3: TGlowEffect;
+    Timer1: TTimer;
     procedure TopPanelMouseDown(Sender: TObject; Button: TMouseButton; Shift: TShiftState; X, Y: Single);
     procedure FormCreate(Sender: TObject);
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
@@ -42,8 +43,9 @@ type
     procedure CloseButtonClick(Sender: TObject);
     procedure DownButtonClick(Sender: TObject);
     procedure UpButtonClick(Sender: TObject);
+    procedure Timer1Timer(Sender: TObject);
   private
-    FFirstMessage: boolean;
+    FFirstMessage, FIsUp: boolean;
     procedure AddMsg(const AMessage: string);
     procedure SwapButtons(const IsUp: boolean);
   end;
@@ -71,7 +73,6 @@ end;
 
 procedure TForm1.DownButtonClick(Sender: TObject);
 begin
-  Height := 222;
   SwapButtons(False);
 end;
 
@@ -110,20 +111,59 @@ procedure TForm1.SwapButtons(const IsUp: boolean);
 begin
   UpButton.Visible := not IsUp;
   DownButton.Visible := IsUp;
+  FIsUp := IsUp;
+  Timer1.Enabled := True;
 end;
 
-procedure TForm1.TMSMQTTClient1ConnectedStatusChanged(ASender: TObject;
-  const AConnected: Boolean; AStatus: TTMSMQTTConnectionStatus);
+procedure TForm1.Timer1Timer(Sender: TObject);
+
+const
+  cInterval = 20;
+  cFormHeight = 222;
+
+begin
+  if FIsUp then
+    begin
+      if Height > Succ(Trunc(TopPanel.Height)) then
+        begin
+          Height := Height - cInterval;
+          Timer1.Enabled := True;
+        end
+      else
+        begin
+          Timer1.Enabled := false;
+          Height := Succ(Trunc(TopPanel.Height));
+        end;
+    end
+  else
+    begin
+      if Height < cFormHeight then
+        begin
+          Height := Height + cInterval;
+          Timer1.Enabled := True;
+        end
+      else
+        begin
+          Timer1.Enabled := false;
+          Height := cFormHeight;
+        end;
+    end;
+end;
+
+procedure TForm1.TMSMQTTClient1ConnectedStatusChanged(ASender: TObject; const AConnected: Boolean; AStatus: TTMSMQTTConnectionStatus);
 begin
   if AConnected then
     begin
       AddMsg('Connected');
       TMSMQTTClient1.Subscribe(cChannel);
+      FFirstMessage := false;
     end
   else
     if not FFirstMessage then
+    begin
       AddMsg('NOT connected');
-  FFirstMessage := false;
+      FFirstMessage := True;
+    end;
 end;
 
 procedure TForm1.TMSMQTTClient1PublishReceived(ASender: TObject;
@@ -139,7 +179,6 @@ end;
 
 procedure TForm1.UpButtonClick(Sender: TObject);
 begin
-  Height := Succ(Trunc(TopPanel.Height));
   SwapButtons(True);
 end;
 
